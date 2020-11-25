@@ -1,3 +1,6 @@
+bb-bulk-ssh-key-linux
+bb-bulk-ssh-key-darwin
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
