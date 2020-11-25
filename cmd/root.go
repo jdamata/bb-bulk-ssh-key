@@ -112,8 +112,6 @@ func main(cmd *cobra.Command, args []string) {
 	}
 }
 
-func uploadSSHKey() {}
-
 func getUserUUID() string {
 	req, err := http.NewRequest("GET", bbBaseUri+"/user", nil)
 	if err != nil {
