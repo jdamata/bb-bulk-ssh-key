@@ -24,5 +24,5 @@ To create an app password:
 ### Run 
 
 ```console
-./bb-bulk-ssh-key -u joeldamata -p <REDACTED> -d ~/joeldamata/.ssh
+./bb-bulk-ssh-key -u joeldamata -p <REDACTED> -d ~/joeldamata/.ssh/
 ```
