@@ -74,7 +74,7 @@ func main(cmd *cobra.Command, args []string) {
 		// Check if file is a valid ssh key
 		_, _, _, _, err = ssh.ParseAuthorizedKey(out)
 		if err != nil {
-			log.Infof("%v is not a valid ssh key. ERROR: %v", fileName, err)
+			log.Debugf("%v is not a valid ssh key. ERROR: %v", fileName, err)
 			continue
 		}
 
@@ -82,25 +82,33 @@ func main(cmd *cobra.Command, args []string) {
 		jsonBody, err := json.Marshal(body)
 		if err != nil {
 			log.Warnf("Failed to marshal ssh key into json body, %v. ERROR: %v", fileName, err)
+			continue
 		}
 
 		req, err := http.NewRequest("POST", bbBaseUri+"/users/"+uuid+"/ssh-keys", bytes.NewBuffer(jsonBody))
 		if err != nil {
 			log.Warnf("Failed to prepare http post request, %v. ERROR: %v", fileName, err)
+			continue
 		}
 
 		req.SetBasicAuth(viper.GetString("username"), viper.GetString("password"))
 		req.Header.Add("Content-Type", "application/json")
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Warnf("Failed to upload ssh key, %v. ERROR: %v", fileName, err)
+			log.Warn(err)
+			continue
 		}
-		defer resp.Body.Close()
 
-		//out, err = ioutil.ReadAll(resp.Body)
-		//var result map[string]interface{}
-		//json.Unmarshal([]byte(out), &result)
-		//log.Info(result)
+		defer resp.Body.Close()
+		out, err = ioutil.ReadAll(resp.Body)
+		var result map[string]interface{}
+		json.Unmarshal([]byte(out), &result)
+
+		if resp.Status == string(http.StatusOK) {
+			log.Infof("Uploaded public key successfully, %v", fileName)
+		} else {
+			log.Warnf("Failed to upload ssh key, %v. ERROR: %v", fileName, result["error"])
+		}
 	}
 }
 
