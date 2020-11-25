@@ -1,5 +1,5 @@
 # bb-bulk-ssh-key
-Upload multiple ssh keys to your bitbucket account. This utility will check a directory for public ssh keypairs and 
+Upload multiple ssh keys to your bitbucket account. This utility will check a directory for public ssh keypairs, validate the public key and upload it to your bitbucket account.
 
 ## Installation
 
