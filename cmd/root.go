@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 
@@ -12,6 +14,7 @@ import (
 )
 
 var (
+	client    = &http.Client{}
 	bbBaseUri = "https://api.bitbucket.org/2.0"
 	rootCmd   = &cobra.Command{
 		Use:   "bb-bulk-ssh-key",
@@ -28,6 +31,7 @@ func Execute(version string) error {
 	rootCmd.PersistentFlags().StringP("password", "p", "", "Bitbucket app password")
 	rootCmd.MarkFlagRequired("password")
 	rootCmd.PersistentFlags().StringP("directory", "d", ".", "Directory to search for ssh keys")
+	viper.BindPFlag("username", rootCmd.PersistentFlags().Lookup("username"))
 	viper.BindPFlag("password", rootCmd.PersistentFlags().Lookup("password"))
 	viper.BindPFlag("directory", rootCmd.PersistentFlags().Lookup("directory"))
 	return rootCmd.Execute()
@@ -40,14 +44,13 @@ func main(cmd *cobra.Command, args []string) {
 	})
 
 	// Get bitbucket user id
-	getUserUUID()
-	log.Fatalf("yo")
+	uuid := getUserUUID()
 	directory := viper.GetString("directory")
 
 	// Iterate through all files in directory and
 	items, err := ioutil.ReadDir(directory)
 	if err != nil {
-		log.Fatalf("Failed to get directory contents: %v", err)
+		log.Fatalf("Failed to get directory contents. ERROR: %v", err)
 	}
 
 	for _, item := range items {
@@ -56,40 +59,73 @@ func main(cmd *cobra.Command, args []string) {
 			continue
 		}
 
+		if item.Name() == "known_hosts" {
+			continue
+		}
+
 		//Read in file contents
-		fileName := item.Name()
+		fileName := directory + item.Name()
 		out, err := ioutil.ReadFile(fileName)
 		if err != nil {
-			log.Warnf("Failed to read file %v", fileName)
+			log.Warnf("Failed to read %v. ERROR: %v", fileName, err)
 			continue
 		}
 
 		// Check if file is a valid ssh key
-		key, err := ssh.ParsePublicKey(out)
+		_, _, _, _, err = ssh.ParseAuthorizedKey(out)
 		if err != nil {
-			log.Infof("File is not a valid ssh key: %v", fileName)
+			log.Infof("%v is not a valid ssh key. ERROR: %v", fileName, err)
+			continue
 		}
 
-		log.Info(key)
-		// curl -X POST -H "Content-Type: application/json" -d '{"key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKqP3Cr632C2dNhhgKVcon4ldUSAeKiku2yP9O9/bDtY user@myhost"}' https://api.bitbucket.org/2.0/users/{ed08f5e1-605b-4f4a-aee4-6c97628a673e}/ssh-keys
+		body := map[string]string{"key": string(out)}
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			log.Warnf("Failed to marshal ssh key into json body, %v. ERROR: %v", fileName, err)
+		}
 
+		req, err := http.NewRequest("POST", bbBaseUri+"/users/"+uuid+"/ssh-keys", bytes.NewBuffer(jsonBody))
+		if err != nil {
+			log.Warnf("Failed to prepare http post request, %v. ERROR: %v", fileName, err)
+		}
+
+		req.SetBasicAuth(viper.GetString("username"), viper.GetString("password"))
+		req.Header.Add("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Warnf("Failed to upload ssh key, %v. ERROR: %v", fileName, err)
+		}
+		defer resp.Body.Close()
+
+		//out, err = ioutil.ReadAll(resp.Body)
+		//var result map[string]interface{}
+		//json.Unmarshal([]byte(out), &result)
+		//log.Info(result)
 	}
 }
 
 func uploadSSHKey() {}
 
 func getUserUUID() string {
-	client := &http.Client{}
 	req, err := http.NewRequest("GET", bbBaseUri+"/user", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Info(viper.GetString("username"), viper.GetString("password"))
+
 	req.SetBasicAuth(viper.GetString("username"), viper.GetString("password"))
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatalf("Failed to get user UUID: %v", err)
+
+		log.Fatalf("Failed to get user UUID. ERROR: %v", err)
 	}
-	log.Info(resp)
-	return ""
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal([]byte(body), &result)
+	return result["uuid"].(string)
 }
