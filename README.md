@@ -19,7 +19,7 @@ To create an app password:
 - Click Create app password.
 - Give the app password a name related to the application that will use the password.
 - Grant write access to account
-- Copy the generated password and either record or paste it into the application you want to give access. The password is only displayed this one time.
+- Copy the generated password. The password is only displayed this one time.
 
 ### Run 
 
